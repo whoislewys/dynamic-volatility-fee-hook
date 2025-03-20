@@ -35,26 +35,36 @@ contract DynamicVolatilityFeeHook is BaseHook {
     constructor(IPoolManager _poolManager) BaseHook(_poolManager) {}
 
     // Required override function for BaseHook to let the PoolManager know which hooks are implemented
-    function getHookPermissions() public pure override returns (Hooks.Permissions memory) {
-        return Hooks.Permissions({
-            beforeInitialize: true, // true
-            afterInitialize: false,
-            beforeAddLiquidity: false,
-            beforeRemoveLiquidity: false,
-            afterAddLiquidity: false,
-            afterRemoveLiquidity: false,
-            beforeSwap: true, // true
-            afterSwap: true, // true
-            beforeDonate: false,
-            afterDonate: false,
-            beforeSwapReturnDelta: false,
-            afterSwapReturnDelta: false,
-            afterAddLiquidityReturnDelta: false,
-            afterRemoveLiquidityReturnDelta: false
-        });
+    function getHookPermissions()
+        public
+        pure
+        override
+        returns (Hooks.Permissions memory)
+    {
+        return
+            Hooks.Permissions({
+                beforeInitialize: true, // true
+                afterInitialize: false,
+                beforeAddLiquidity: false,
+                beforeRemoveLiquidity: false,
+                afterAddLiquidity: false,
+                afterRemoveLiquidity: false,
+                beforeSwap: true, // true
+                afterSwap: true, // true
+                beforeDonate: false,
+                afterDonate: false,
+                beforeSwapReturnDelta: false,
+                afterSwapReturnDelta: false,
+                afterAddLiquidityReturnDelta: false,
+                afterRemoveLiquidityReturnDelta: false
+            });
     }
 
-    function _beforeInitialize(address, PoolKey calldata key, uint160) internal pure override returns (bytes4) {
+    function _beforeInitialize(
+        address,
+        PoolKey calldata key,
+        uint160
+    ) internal pure override returns (bytes4) {
         // `.isDynamicFee()` function comes from using
         // the `LPFeeLibrary` for `uint24`
         if (!key.fee.isDynamicFee()) revert MustUseDynamicFee();
@@ -64,11 +74,12 @@ contract DynamicVolatilityFeeHook is BaseHook {
         return this.beforeInitialize.selector;
     }
 
-    function _beforeSwap(address, PoolKey calldata key, IPoolManager.SwapParams calldata params, bytes calldata)
-        internal
-        override
-        returns (bytes4, BeforeSwapDelta, uint24)
-    {
+    function _beforeSwap(
+        address,
+        PoolKey calldata key,
+        IPoolManager.SwapParams calldata params,
+        bytes calldata
+    ) internal override returns (bytes4, BeforeSwapDelta, uint24) {
         // Orginal constant volatility fee design accounted only for exactIn swaps, so keep this for now (may be possible to support exactOut too, not sure yet how)
         require(params.amountSpecified > 0, "Only exact in swaps allowed");
 
@@ -79,23 +90,37 @@ contract DynamicVolatilityFeeHook is BaseHook {
             // exactIn, 0 -> 1
             // TODO: get in range liquidity in t0
             poolManager.updateDynamicLPFee(
-                key, getFee(targetIv, 1 ether, uint256(params.amountSpecified), timeSinceLastSwap)
+                key,
+                getFee(
+                    targetIv,
+                    1 ether,
+                    uint256(params.amountSpecified),
+                    timeSinceLastSwap
+                )
             );
         } else {
             // exact in, 1 -> 0
             // TODO: get in range liquidity in t1
             poolManager.updateDynamicLPFee(
-                key, getFee(targetIv, 1 ether, uint256(params.amountSpecified), timeSinceLastSwap)
+                key,
+                getFee(
+                    targetIv,
+                    1 ether,
+                    uint256(params.amountSpecified),
+                    timeSinceLastSwap
+                )
             );
         }
     }
 
     // TODO: remove afterSwap ability?
-    function _afterSwap(address, PoolKey calldata, IPoolManager.SwapParams calldata, BalanceDelta, bytes calldata)
-        internal
-        override
-        returns (bytes4, int128)
-    {
+    function _afterSwap(
+        address,
+        PoolKey calldata,
+        IPoolManager.SwapParams calldata,
+        BalanceDelta,
+        bytes calldata
+    ) internal override returns (bytes4, int128) {
         return (this.afterSwap.selector, 0);
     }
 
@@ -124,25 +149,50 @@ contract DynamicVolatilityFeeHook is BaseHook {
     //     return uint24(iv_seconds * sqrt_liq_swap_ratio * sqrt_delta_t);
     // }
 
-    // Floating pt attempt
+    // Floating pt attempt working for test 1 & 2
     // Calculates fee on amountIn such that the volatility of the pool in response to the swap equals the target volatility
     // fee = iv_per_year / (2 * math.sqrt(365 * 24 * 60 * 60)) * math.sqrt(tick_tvl / amount0) * math.sqrt(deltaT_secs)
-    function getFee(uint256 iv, uint256 tickTvlInToken, uint256 amount, uint256 deltaTSecs)
-        public
-        pure
-        returns (uint24)
-    {
-        int128 ivSeconds = ABDKMath64x64.div(ABDKMath64x64.fromUInt(iv), ABDKMath64x64.fromUInt(11231));
+    // function getFee(uint256 iv, uint256 tickTvlInToken, uint256 amount, uint256 deltaTSecs)
+    //     public
+    //     pure
+    //     returns (uint24)
+    // {
+    //     int128 ivSeconds = ABDKMath64x64.div(ABDKMath64x64.fromUInt(iv), ABDKMath64x64.fromUInt(11231));
 
-        uint256 liqSwapRatio = tickTvlInToken / amount;
-        console.log("liqSwapRatio", liqSwapRatio);
+    //     uint256 liqSwapRatio = tickTvlInToken / amount;
+    //     console.log("liqSwapRatio", liqSwapRatio);
 
-        int128 sqrtLiqSwapRatio = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(liqSwapRatio));
+    //     int128 sqrtLiqSwapRatio = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(liqSwapRatio));
 
-        int128 sqrtDeltaT = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(deltaTSecs));
+    //     int128 sqrtDeltaT = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(deltaTSecs));
 
-        int128 fee = ABDKMath64x64.mul(ABDKMath64x64.mul(ivSeconds, sqrtLiqSwapRatio), sqrtDeltaT);
-        
-        return uint24(ABDKMath64x64.toUInt(fee));
+    //     int128 fee = ABDKMath64x64.mul(ABDKMath64x64.mul(ivSeconds, sqrtLiqSwapRatio), sqrtDeltaT);
+
+    //     // TODO: add a floor fee for when tick tvl gets exhausted by 1 swap
+    //     // TODO: add a max fee for when deltaTSecs gets v large
+
+    //     return uint24(ABDKMath64x64.toUInt(fee));
+    // }
+
+    function getFee(
+        uint256 iv,
+        uint256 tickTvlInToken,
+        uint256 amount,
+        uint256 deltaTSecs
+    ) public pure returns (uint24) {
+        uint256 ivSeconds = iv / 11231;
+
+        // Calculate sqrt(tickTvlInToken/amount) with scaling for precision
+        uint256 scale = 1e18;
+        uint256 sqrtRatio;
+
+        sqrtRatio = FixedPointMathLib.sqrt((tickTvlInToken * scale) / amount);
+
+        // Calculate sqrt(deltaT)
+        uint256 sqrtDeltaT = FixedPointMathLib.sqrt(deltaTSecs * scale);
+
+        uint256 fee = (ivSeconds * sqrtRatio * sqrtDeltaT) / (scale);
+
+        return uint24(fee);
     }
 }
