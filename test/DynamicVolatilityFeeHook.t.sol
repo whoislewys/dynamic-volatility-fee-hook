@@ -82,11 +82,11 @@ contract TestGasPriceFeesHook is Test, Deployers {
 
     function test_getFee() public {
         GetFeeTestCase memory testCase = GetFeeTestCase({
-            iv: 1_000_000, // 100% annual volatility target
-            tickTvlInToken: 315 ether,
+            iv: 1_000_000, // 100% annual volatility target in fee units (1 100th of a bp)
+            tickTvlInToken: 315 ether, // 315 eth
             amount: 1 ether, // 1 ETH trade
             deltaTSecs: 15, // 15 secs since last trade
-            expectedFee: 6120
+            expectedFee: 6120 // matching original medium post & python replication. for more, see: notebooks/constant-volatility-fee-calcs.ipynb
         });
 
         uint24 fee = hook.getFee(
