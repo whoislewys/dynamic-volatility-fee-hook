@@ -135,6 +135,7 @@ contract DynamicVolatilityFeeHook is BaseHook {
         int128 ivSeconds = ABDKMath64x64.div(ABDKMath64x64.fromUInt(iv), ABDKMath64x64.fromUInt(11231));
 
         uint256 liqSwapRatio = tickTvlInToken / amount;
+        console.log("liqSwapRatio", liqSwapRatio);
 
         int128 sqrtLiqSwapRatio = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(liqSwapRatio));
 

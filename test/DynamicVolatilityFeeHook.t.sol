@@ -82,22 +82,41 @@ contract TestGasPriceFeesHook is Test, Deployers {
     }
 
     function test_getFee() public {
-        GetFeeTestCase memory testCase = GetFeeTestCase({
-            iv: 1_000_000, // 100% annual volatility target in fee units (1 100th of a bp)
-            tickTvlInToken: 315 ether, // 315 eth
-            amount: 1 ether, // 1 ETH trade
-            deltaTSecs: 15, // 15 secs since last trade
-            expectedFee: 6120 // matching original medium post & python replication. for more, see: notebooks/constant-volatility-fee-calcs.ipynb
-        });
+        GetFeeTestCase[3] memory testCases = [
+            GetFeeTestCase({
+                iv: 1_000_000, // 100% annual volatility target in fee units (1 100th of a bp)
+                tickTvlInToken: 315 ether, // 315 eth
+                amount: 1 ether, // 1 ETH trade
+                deltaTSecs: 15, // 15 secs since last trade
+                expectedFee: 6120 // matching original medium post & python replication. for more, see: notebooks/constant-volatility-fee-calcs.ipynb
+            }),
+            GetFeeTestCase({
+                iv: 1_000_000, // 100% annual volatility target in fee units (1 100th of a bp)
+                tickTvlInToken: 315 ether, // 315 eth
+                amount: 1 ether, // 1 ETH trade
+                deltaTSecs: 30, // 30 secs since last trade (2 blocks)
+                expectedFee: 8655 // matching original medium post & python replication
+            }),
+            GetFeeTestCase({
+                iv: 1_000_000, // 100% annual volatility target in fee units (1 100th of a bp)
+                tickTvlInToken: 315 ether, // 315 eth
+                amount: 1000 ether, // 1000 ETH whale trade
+                deltaTSecs: 15, // 15 secs since last trade (1 block)
+                expectedFee: 193 // matching original medium post & python replication
+            })
+        ];
 
-        uint24 fee = hook.getFee(
-            testCase.iv,
-            testCase.tickTvlInToken, 
-            testCase.amount,
-            testCase.deltaTSecs
-        );
+        for (uint256 i = 0; i < testCases.length; i++) {
+            GetFeeTestCase memory testCase = testCases[i];
+            uint24 fee = hook.getFee(
+                testCase.iv,
+                testCase.tickTvlInToken,
+                testCase.amount,
+                testCase.deltaTSecs
+            );
 
-        assertEq(fee, testCase.expectedFee);
+            assertEq(fee, testCase.expectedFee);
+        }
     }
 
     // TODO: test case where two swaps happen in one block so timeSinceLastSwap is 0
