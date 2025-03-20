@@ -9,6 +9,11 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {BalanceDelta} from "v4-core/types/BalanceDelta.sol";
 import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapDelta.sol";
+import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol";
+import {TickMath} from "v4-core/libraries/TickMath.sol";
+import {FullMath} from "v4-core/libraries/FullMath.sol";
+import "lib/abdk-libraries-solidity/ABDKMath64x64.sol";
+
 import {console} from "forge-std/console.sol";
 
 contract DynamicVolatilityFeeHook is BaseHook {
@@ -94,6 +99,32 @@ contract DynamicVolatilityFeeHook is BaseHook {
         return (this.afterSwap.selector, 0);
     }
 
+    // Fixed point 1st attempt - too innaccurate
+    // Calculates fee on amountIn such that the volatility of the pool in response to the swap equals the target volatility
+    // fee = iv_per_year / (2 * math.sqrt(365 * 24 * 60 * 60)) * math.sqrt(tick_tvl / amount0) * math.sqrt(deltaT_secs)
+    // function getFee(uint256 iv, uint256 tickTvlInToken, uint256 amount, uint256 deltaTSecs)
+    //     public
+    //     pure
+    //     returns (uint24)
+    // {
+
+    //     console.log("iv_seconds: ", iv/11231);
+    //     uint256 iv_seconds = iv / 11231;
+
+    //     uint256 liq_swap_ratio = tickTvlInToken / amount;
+    //     console.log("liq_swap_ratio", liq_swap_ratio);
+
+    //     uint256 sqrt_liq_swap_ratio = FixedPointMathLib.sqrt(tickTvlInToken / amount);
+    //     console.log("sqrt_liq_swap_ratio: ", sqrt_liq_swap_ratio);
+
+    //     uint256 sqrt_delta_t = FixedPointMathLib.sqrt(deltaTSecs);
+    //     console.log("sqrt_delta_t: ", sqrt_delta_t);
+
+    //     // return uint24(iv / 11231 * FixedPointMathLib.sqrt(tickTvlInToken / amount) * FixedPointMathLib.sqrt(deltaTSecs));
+    //     return uint24(iv_seconds * sqrt_liq_swap_ratio * sqrt_delta_t);
+    // }
+
+    // Floating pt attempt
     // Calculates fee on amountIn such that the volatility of the pool in response to the swap equals the target volatility
     // fee = iv_per_year / (2 * math.sqrt(365 * 24 * 60 * 60)) * math.sqrt(tick_tvl / amount0) * math.sqrt(deltaT_secs)
     function getFee(uint256 iv, uint256 tickTvlInToken, uint256 amount, uint256 deltaTSecs)
@@ -101,19 +132,16 @@ contract DynamicVolatilityFeeHook is BaseHook {
         pure
         returns (uint24)
     {
-        // return uint24(iv / 11231 * FixedPointMathLib.sqrt(tickTvlInToken / amount) * FixedPointMathLib.sqrt(deltaTSecs));
+        int128 ivSeconds = ABDKMath64x64.div(ABDKMath64x64.fromUInt(iv), ABDKMath64x64.fromUInt(11231));
 
-        console.log("iv_seconds: ", iv/11231);
+        uint256 liqSwapRatio = tickTvlInToken / amount;
 
-        uint256 liq_swap_ratio = tickTvlInToken / amount;
-        console.log("liq_swap_ratio", liq_swap_ratio);
+        int128 sqrtLiqSwapRatio = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(liqSwapRatio));
 
-        uint256 sqrt_liq_swap_ratio = FixedPointMathLib.sqrt(tickTvlInToken / amount);
-        console.log("sqrt_liq_swap_ratio: ", sqrt_liq_swap_ratio);
+        int128 sqrtDeltaT = ABDKMath64x64.sqrt(ABDKMath64x64.fromUInt(deltaTSecs));
 
-        uint256 sqrt_delta_t = FixedPointMathLib.sqrt(deltaTSecs);
-        console.log("sqrt_delta_t: ", sqrt_delta_t);
-
-        return uint24(iv / 11231 * FixedPointMathLib.sqrt(tickTvlInToken / amount) * FixedPointMathLib.sqrt(deltaTSecs));
+        int128 fee = ABDKMath64x64.mul(ABDKMath64x64.mul(ivSeconds, sqrtLiqSwapRatio), sqrtDeltaT);
+        
+        return uint24(ABDKMath64x64.toUInt(fee));
     }
 }
