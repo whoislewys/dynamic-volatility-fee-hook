@@ -4,3 +4,6 @@
 [submodule "lib/v4-periphery"]
 	path = lib/v4-periphery
 	url = https://github.com/uniswap/v4-periphery
+[submodule "lib/abdk-libraries-solidity"]
+	path = lib/abdk-libraries-solidity
+	url = https://github.com/abdk-consulting/abdk-libraries-solidity
