@@ -1,4 +1,4 @@
-// Note to self, max constraints: 2^26
+// Note to self, max constraints: 2^26 (source:https://web.archive.org/web/20250122054233mp_/https://docs.brevis.network/developer-resources/limits-and-performance)
 // 67108864
 package circuits
 
@@ -22,45 +22,11 @@ func (c *AppCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return 32, 32, 0
 }
 
-// func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
-// 	receipts := sdk.NewDataStream(api, in.Receipts)
-// 	receipt := sdk.GetUnderlying(receipts, 0)
-
-// 	// Check logic
-// 	// The first field exports `from` parameter from Transfer Event
-// 	// It should use the second topic in Transfer Event log
-// 	api.Uint248.AssertIsEqual(receipt.Fields[0].Contract, USDCTokenAddr)
-// 	api.Uint248.AssertIsEqual(receipt.Fields[0].IsTopic, sdk.ConstUint248(1))
-// 	api.Uint248.AssertIsEqual(receipt.Fields[0].Index, sdk.ConstUint248(1))
-
-// 	// Make sure two fields uses the same log to make sure account address linking with correct volume
-// 	api.Uint32.AssertIsEqual(receipt.Fields[0].LogPos, receipt.Fields[1].LogPos)
-
-// 	// The second field exports `Volume` parameter from Transfer Event
-// 	// It should use Data in Transfer Event log
-// 	api.Uint248.AssertIsEqual(receipt.Fields[1].IsTopic, sdk.ConstUint248(0))
-// 	api.Uint248.AssertIsEqual(receipt.Fields[1].Index, sdk.ConstUint248(0))
-
-// 	api.Uint248.AssertIsLessOrEqual(minimumVolume, api.ToUint248(receipt.Fields[1].Value))
-
-//		// Outputs
-//		api.OutputUint(64, api.ToUint248(receipt.BlockNum))
-//		api.OutputAddress(api.ToUint248(receipt.Fields[0].Value))
-//		api.OutputBytes32(receipt.Fields[1].Value)
-//		return nil
-//	}
-
 // Calculate IV
 // IV will be calculated in this circuit, then pushed to the smart contract to update the target IV.
 // So, what do we need? IV can be calculated from Uniswap data as such:
 // iv = 2 * (feeTier / 10 ** 6) * (dailyVolume / tickTvl) ** 0.5 * Math.sqrt(365)
 // The other input besides tickTvl is volume, which can be easily summed up from swap events
-
-// For calculating tickTvl in the circuit, can approximate tickTvl very closely, without calling view functions (which is very difficult in brevis), with:
-// ((liquidity + 1) * feeTier * d0) / (1.0001 ** (tick / 2) * 10 ** (decs0 + 6))
-// d0 is derivedEth value which for weth=1. decs0=18 for weth
-// ((liquidity + 1) * 500 * 1) / (1.0001 ** (tick / 2) * 10 ** (18 + 6))
-// (a more robust version of this methodology is [detailed here](https://lambert-guillaume.medium.com/on-chain-volatility-and-uniswap-v3-d031b98143d1) and used in production at panoptic)
 func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	// Start by getting volume by summing abs(amount1)
 	swapReceipts := sdk.NewDataStream(api, in.Receipts)
@@ -79,7 +45,7 @@ func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	slot0 := sdk.GetUnderlying(storageSlots, 0)
 
 	currentTickBits := api.Int248.ToBinary(api.ToInt248(slot0.Value))[160:184] // bits 160 : 184 store `tick` in slot0
-	currentTick := api.Int248.FromBinary(currentTickBits...)
+	currentTick := api.Uint248.FromBinary(currentTickBits...)
 	currentTickBytes := api.Bytes32.FromBinary(currentTickBits...)
 	fmt.Println("current tick, currenttickbytes")
 	fmt.Println(currentTick.String(), currentTickBytes.String())
@@ -89,7 +55,25 @@ func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	fmt.Printf("Liquidity: %s\n", liquidity.String())
 
 	// Calculate iv
-	iv := sdk.ConstUint248(69)
+
+	// Calculate IV, but don't divide by fee tier decimals to leave IV in fee tier units. this is how the target_iv is represented in the smart contract
+	// Calculate daily volume from total volume
+	dailyVolume := api.ToUint248(totalVolume)
+
+	// approximate tickTvl by taking in range liquidity and calculating it all in token1 in a 1 tick wide range
+	tickTvlIn1 := GetAmount1ForLiquidity(api, currentTick, api.Uint248.Add(currentTick, sdk.ConstUint248(1)), liquidity)
+
+	// Calculate square root of (dailyVolume/tickTvl)
+	volTvlRatio, _ := api.Uint248.Div(dailyVolume, tickTvlIn1)
+	sqrtVolTvl := api.Uint248.Sqrt(volTvlRatio)
+
+	// sqrt(365)
+	sqrtOf365 := sdk.ConstUint248(19) // sqrt(365) = 19.1049731745428
+
+	// Calculate IV: 2 * feeTier * sqrt(dailyVolume/tickTvl) * sqrt(365)
+	// Fee tier is 500 bps (0.05%)
+	feeTierU248 := sdk.ConstUint248(500)
+	iv := api.Uint248.Mul(api.Uint248.Mul(api.Uint248.Mul(sdk.ConstUint248(2), feeTierU248), sqrtVolTvl), sqrtOf365)
 
 	// Outputs
 	// Will be able to decode like this:
@@ -101,4 +85,19 @@ func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	api.OutputUint(248, iv)
 
 	return nil
+}
+
+// getAmount1ForLiquidity, but operate in tick space rather than sqrt price space, since there are no power functions in brevis circuit api
+// See section 2.1, equation 2, but without squareroots around the prices. https://atiselsts.github.io/pdfs/uniswap-v3-liquidity-math.pdf
+func GetAmount1ForLiquidity(api *sdk.CircuitAPI, tickA sdk.Uint248, tickB sdk.Uint248, liquidity sdk.Uint248) sdk.Uint248 {
+	isGreater := api.Uint248.IsGreaterThan(tickA, tickB)
+
+	finalTickA := api.Uint248.Select(isGreater, tickB, tickA)
+	finalTickB := api.Uint248.Select(isGreater, tickA, tickB)
+
+	tickDiff := api.Uint248.Sub(finalTickB, finalTickA)
+
+	amount1 := api.Uint248.Mul(liquidity, tickDiff)
+
+	return amount1
 }
