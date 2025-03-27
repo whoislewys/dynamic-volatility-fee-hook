@@ -82,14 +82,22 @@ func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	currentTick := api.Int248.FromBinary(currentTickBits...)
 	currentTickBytes := api.Bytes32.FromBinary(currentTickBits...)
 	fmt.Println("current tick, currenttickbytes")
-	fmt.Println(currentTick, currentTickBytes)
+	fmt.Println(currentTick.String(), currentTickBytes.String())
 
 	slot4 := sdk.GetUnderlying(storageSlots, 1)
+	liquidity := api.ToUint248(slot4.Value) // Extract uint128 liquidity
+	fmt.Printf("Liquidity: %s\n", liquidity.String())
 
 	// Calculate iv
 	iv := sdk.ConstUint248(69)
 
 	// Outputs
+	// Will be able to decode like this:
+	// function decodeOutput(bytes calldata o) internal pure returns (uint256) {
+	// 	uint256 target_iv = uint256(uint248(bytes31(o[0:31]))); // start with iv uint248 (248 / 8 = 31 bytes)
+	// 	return target_iv;
+	// }
+
 	api.OutputUint(248, iv)
 
 	return nil

@@ -109,7 +109,7 @@ func TestCircuit(t *testing.T) {
 			BlockNum: big.NewInt(22135817),
 			Address:  usdcWeth5BpsPool,
 			Slot:     common.HexToHash("0x0"),
-			Value:    common.HexToHash("0x00010002d302d30140030de900000000000056bac52c49e2000000001151dbd7"), // tick of ~200161
+			Value:    common.HexToHash("0x00010002d302d30140030de900000000000056bac52c49e2000000001151dbd7"), // tick of 200169
 		},
 	)
 
@@ -119,7 +119,7 @@ func TestCircuit(t *testing.T) {
 			BlockNum: big.NewInt(22135817),
 			Address:  usdcWeth5BpsPool,
 			Slot:     common.HexToHash("0x4"),
-			Value:    common.HexToHash("0x000000000000000000000000000000000000000000000000f336f69b81b8268e"), // liquidity of ~17525466147715557006
+			Value:    common.HexToHash("0x000000000000000000000000000000000000000000000000f336f69b81b8268e"), // liquidity of 17525466147715557006
 		},
 	)
 
