@@ -71,8 +71,6 @@ contract ConstantVolatilityAMMHook is BaseHook {
         // the `LPFeeLibrary` for `uint24`
         if (!key.fee.isDynamicFee()) revert MustUseDynamicFee();
 
-        // TODO: use brevis to initialize volatility target
-
         return this.beforeInitialize.selector;
     }
 
