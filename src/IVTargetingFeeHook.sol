@@ -12,6 +12,7 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapD
 import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {FullMath} from "v4-core/libraries/FullMath.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "./brevis/BrevisApp.sol";
 import "./brevis/IBrevisProof.sol";
 
@@ -31,6 +32,8 @@ contract IVTargetingFeeHook is BaseHook, BrevisApp, Ownable {
 
     // The target impl vol
     uint256 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
+
+    bytes32 public vkHash;
 
     // Errors
     error MustUseDynamicFee();
@@ -165,15 +168,15 @@ contract IVTargetingFeeHook is BaseHook, BrevisApp, Ownable {
         // our designated verifying key. This proves that the _circuitOutput is authentic
         require(vkHash == _vkHash, "invalid vk");
 
-        iv = decodeOutput(_circuitOutput);
+        targetIv = decodeOutput(_circuitOutput);
 
-        emit IVUpdated(iv);
+        emit IVUpdated(targetIv);
     }
 
     function decodeOutput(bytes calldata o) internal pure returns (uint256) {
-        targetIv = uint256(uint248(bytes31(o[0:31]))); // extract _targetIv from circuit uint248 output as (248 / 8 = 31 bytes), then convert to uint256
+        uint256 _targetIv = uint256(uint248(bytes31(o[0:31]))); // extract _targetIv from circuit uint248 output (248 / 8 = 31 bytes), then convert to uint256
 
-        emit VolatilityUpdated(volatility);
+        return _targetIv;
     }
 
     function setVkHash(bytes32 _vkHash) external onlyOwner {

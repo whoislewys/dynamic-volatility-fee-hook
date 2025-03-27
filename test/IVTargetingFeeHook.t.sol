@@ -16,11 +16,15 @@ import {IVTargetingFeeHook} from "../src/IVTargetingFeeHook.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {console} from "forge-std/console.sol";
 import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol";
+import {MockBrevisProof} from "../src/brevis/MockBrevisProof.sol";
 
 contract TestGasPriceFeesHook is Test, Deployers {
     using PoolIdLibrary for PoolKey;
 
     IVTargetingFeeHook hook;
+
+    bytes32 private constant vkHash = 0x658967d179b53c6a25fe83190ba8342c4922ab556e69a87ccc5414d92c84f9e3; // obtained from $HOME/circuitOut dir set in brevis quickstart repo
+    MockBrevisProof private brevisProofMock;
 
     function setUp() public {
         // Deploy v4-core
@@ -28,6 +32,9 @@ contract TestGasPriceFeesHook is Test, Deployers {
 
         // Deploy, mint tokens, and approve all periphery contracts for two tokens
         deployMintAndApprove2Currencies();
+
+        // mock brevis proof conch
+        brevisProofMock = new MockBrevisProof();
 
         // Deploy our hook with the proper flags
         address hookAddress = address(
@@ -39,10 +46,12 @@ contract TestGasPriceFeesHook is Test, Deployers {
 
         deployCodeTo(
             "IVTargetingFeeHook.sol",
-            abi.encode(manager),
+            abi.encode(manager, address(brevisProofMock)),
             hookAddress
         );
         hook = IVTargetingFeeHook(hookAddress);
+
+        hook.setVkHash(vkHash);
 
         // Initialize a pool
         (key, ) = initPool(
