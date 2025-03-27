@@ -22,7 +22,7 @@ contract ConstantVolatilityAMMHook is BaseHook {
     uint256 public lastSwappedTimestamp;
 
     // The target impl vol
-    uint24 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
+    uint256 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
 
     uint256 private DECIMALS = 10000;
 

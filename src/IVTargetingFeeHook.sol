@@ -24,13 +24,19 @@ import "./brevis/IBrevisProof.sol";
 contract IVTargetingFeeHook is BaseHook, BrevisApp, Ownable {
     using LPFeeLibrary for uint24;
 
+    // Storage
+
     // Keeping track of last time transacted
     uint256 public lastSwappedTimestamp;
 
     // The target impl vol
-    uint24 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
+    uint256 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
 
+    // Errors
     error MustUseDynamicFee();
+
+    // Events
+    event IVUpdated(uint256 iv);
 
     constructor(
         IPoolManager _poolManager,
@@ -159,14 +165,15 @@ contract IVTargetingFeeHook is BaseHook, BrevisApp, Ownable {
         // our designated verifying key. This proves that the _circuitOutput is authentic
         require(vkHash == _vkHash, "invalid vk");
 
-        volatility = decodeOutput(_circuitOutput);
+        iv = decodeOutput(_circuitOutput);
 
-        emit VolatilityUpdated(volatility);
+        emit IVUpdated(iv);
     }
 
     function decodeOutput(bytes calldata o) internal pure returns (uint256) {
-        uint256 target_iv = uint256(uint248(bytes31(o[0:31]))); // start with iv uint248 (248 / 8 = 31 bytes)
-        return target_iv;
+        targetIv = uint256(uint248(bytes31(o[0:31]))); // extract _targetIv from circuit uint248 output as (248 / 8 = 31 bytes), then convert to uint256
+
+        emit VolatilityUpdated(volatility);
     }
 
     function setVkHash(bytes32 _vkHash) external onlyOwner {
