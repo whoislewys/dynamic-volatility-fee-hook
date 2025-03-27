@@ -19,7 +19,12 @@ var _ sdk.AppCircuit = &AppCircuit{}
 func (c *AppCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	// Allocate n receipts for swaps to calc volume and 2 storage inputs - 1 for current tick and 1 for liquidity
 	// according to error messages, allocated space must be an integral multiple of 32 kek
+
+	// unit test allocation
 	return 32, 32, 0
+
+	// prod allocation
+	// return 3840, 32, 0
 }
 
 // Calculate IV
@@ -46,9 +51,7 @@ func (c *AppCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	currentTickBits := api.Int248.ToBinary(api.ToInt248(slot0.Value))[160:184] // bits 160 : 184 store `tick` in slot0
 	currentTick := api.Uint248.FromBinary(currentTickBits...)
-	currentTickBytes := api.Bytes32.FromBinary(currentTickBits...)
-	fmt.Println("current tick, currenttickbytes")
-	fmt.Println(currentTick.String(), currentTickBytes.String())
+	// fmt.Println(currentTick.String(), currentTickBytes.String())
 
 	slot4 := sdk.GetUnderlying(storageSlots, 1)
 	liquidity := api.ToUint248(slot4.Value) // Extract uint128 liquidity
