@@ -12,7 +12,7 @@ import {LPFeeLibrary} from "v4-core/libraries/LPFeeLibrary.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {Hooks} from "v4-core/libraries/Hooks.sol";
 import {PoolSwapTest} from "v4-core/test/PoolSwapTest.sol";
-import {DynamicVolatilityFeeHook} from "../src/DynamicVolatilityFeeHook.sol";
+import {ConstantVolatilityAMMHook} from "../src/ConstantVolatilityAMMHook.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {console} from "forge-std/console.sol";
 import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol";
@@ -20,7 +20,7 @@ import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol"
 contract TestGasPriceFeesHook is Test, Deployers {
     using PoolIdLibrary for PoolKey;
 
-    DynamicVolatilityFeeHook hook;
+    ConstantVolatilityAMMHook hook;
 
     function setUp() public {
         // Deploy v4-core
@@ -33,17 +33,16 @@ contract TestGasPriceFeesHook is Test, Deployers {
         address hookAddress = address(
             uint160(
                 Hooks.BEFORE_INITIALIZE_FLAG |
-                    Hooks.BEFORE_SWAP_FLAG |
-                    Hooks.AFTER_SWAP_FLAG
+                    Hooks.BEFORE_SWAP_FLAG
             )
         );
 
         deployCodeTo(
-            "DynamicVolatilityFeeHook.sol",
+            "ConstantVolatilityAMMHook.sol",
             abi.encode(manager),
             hookAddress
         );
-        hook = DynamicVolatilityFeeHook(hookAddress);
+        hook = ConstantVolatilityAMMHook(hookAddress);
 
         // Initialize a pool
         (key, ) = initPool(
