@@ -12,9 +12,6 @@ import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "v4-core/types/BeforeSwapD
 import {LiquidityAmounts} from "v4-periphery/src/libraries/LiquidityAmounts.sol";
 import {TickMath} from "v4-core/libraries/TickMath.sol";
 import {FullMath} from "v4-core/libraries/FullMath.sol";
-import "lib/abdk-libraries-solidity/ABDKMath64x64.sol";
-
-import {console} from "forge-std/console.sol";
 
 // named this for discoverability, it is really a constant *implied* volatility AMM
 // source of original idea: https://lambert-guillaume.medium.com/designing-a-constant-volatility-amm-e167278b5d61#:~:text=TL%3BDR%3A%20Constant%20volatility%20AMMs,dynamics%20of%20the%20underlying%20assets.
@@ -28,8 +25,6 @@ contract ConstantVolatilityAMMHook is BaseHook {
     uint24 public targetIv = 1_000_000; // 100% in fee tier units (100ths of bips)
 
     uint256 private DECIMALS = 10000;
-    /// from LPFeeLibrary.sol | @notice the lp fee is represented in hundredths of a bip, so the max is 100%
-    // uint24 public constant MAX_LP_FEE = 1000000;
 
     error MustUseDynamicFee();
 
